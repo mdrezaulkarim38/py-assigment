@@ -4,11 +4,14 @@ services:
     ports:
       - "5000:5000"
 
-  # Add your own service here once you've built your solution, e.g.:
-  #
-  # runner:
-  #   build: .
-  #   depends_on:
-  #     - mock_api
-  #   environment:
-  #     - MOCK_API_URL=http://mock_api:5000
+  runner:
+    build: .
+    depends_on:
+      - mock_api
+    environment:
+      - MOCK_API_URL=http://mock_api:5000
+      - JOB_ID=docker-job-1
+    volumes:
+      # Mount a local config to override defaults without rebuilding:
+      # - ./config.example.json:/app/config.json:ro
+      - ./output:/app/output
