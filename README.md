@@ -1,44 +1,63 @@
-⚠️ **STATUS: PROOF OF CONCEPT — DO NOT DEPLOY TO PRODUCTION** ⚠️
+# Automated Pitch Boundary & Crop Engine — Production Pipeline
 
-# Automated Pitch Boundary & Camera Crop Engine (Prototype)
+Production-ready refactor of `synthetic_field_prototype.py` (kept for reference; **do not use in production**).
 
-## Overview
+## Layout
 
-This repository contains the v0.1 prototype for the automated pitch-boundary and camera-crop initiative. It is a
-computer-vision pipeline designed to ingest multi-camera match video, detect the playing-field boundary in each
-frame, and derive a recommended camera crop layout from that boundary.
+- `main.py` — thin entry point (argparse + wiring only, exit codes 0/1/2).
+- `src/config.py` — validated `AppConfig` (pydantic, `extra="forbid"`). Fails fast at load.
+- `src/detectors/` — `FieldDetector` Protocol + `GreenThresholdDetector` + factory.
+  The **only** seam that flexes for new sports/models.
+- `src/pipeline/analyzer.py` — sampled, observable pipeline; `results.py` (aggregated output), `errors.py` (fatal vs non-fatal taxonomy).
+- `src/reporting/` — validated `JobProgress`/`JobEvent` wire models + `ReportingClient`.
+- `src/logging_setup.py` — structured stdout logging for unattended batch runs.
+- `config.example.json` — copy to `config.json` and edit.
+- `tests/` — `pytest` suite (config fail-fast, detector, sampling, wire models).
+- `Dockerfile` + `docker-compose.yml` — `runner` service reports to `mock_api` over HTTP.
 
-Currently, this is a synchronous, single-file script primarily used by the research team to validate the detection
-approach before it gets built out into a production pipeline.
-
-## Technology Stack
-
-- **Language:** Python 3.12+
-- **Field Detection:** Mock segmentation mask (color-threshold placeholder standing in for a real SAM-style model).
-- **Geometry:** Shapely, for polygon derivation and spatial checks.
-- **Video I/O:** OpenCV (`cv2.VideoCapture`).
-
-## Features
-
-- **Synthetic Feed Generation:** Generates a dummy match-style video so the script runs standalone with no external
-  assets.
-- **Field-Boundary Detection:** Extracts a mask per frame and derives a boundary polygon from it.
-- **Crop Recommendation Inputs:** The boundary polygons produced here are meant to feed a downstream crop-layout
-  step (not yet implemented in this prototype).
-- **Execution Metrics:** Reports how many frames were processed and how many boundaries were found.
-
-## Installation
-
-Ensure you have a virtual environment set up, then install the dependencies:
+## Quickstart (local)
 
 ```bash
 pip install -r requirements.txt
+cp config.example.json config.json   # edit video_path / stride as needed
+python main.py --config config.json --generate-feed
+# result -> output/result.json
 ```
 
-## Usage
-
-To run the pipeline with a generated synthetic feed, execute the entry point:
+Run tests:
 
 ```bash
-python synthetic_field_prototype.py
+pytest -q
 ```
+
+Try bad config (fail-fast demo):
+
+```bash
+python -c "import json; c=json.load(open('config.example.json')); c['sample_stride']=0; json.dump(c, open('/tmp/bad.json','w'))"
+python main.py --config /tmp/bad.json; echo "exit=$?"
+# CONFIG ERROR ... exit=2, before any video work
+```
+
+## Docker + reporting
+
+```bash
+docker compose up --build
+# runner -> http://mock_api:5000/api/v1/jobs/{progress,events}
+# check events:
+curl http://localhost:5000/api/v1/jobs/events
+```
+
+`MOCK_API_URL` / `JOB_ID` / `VIDEO_PATH` env vars override `config.json` (re-validated).
+A reporting outage logs a warning and the pipeline **continues** (exit 0 if video
+succeeded); a video failure reports a `failed` event best-effort and exits 1.
+The two are never conflated — see `src/pipeline/errors.py`.
+
+## Efficiency notes
+
+- `sample_stride: 15` at 30 fps ⇒ ~2 fps analysis. Skipped frames use
+  `cap.grab()` (no decode), so runtime scales with inspected frames, not file length.
+- Outer-boundary polygon, HSV bounds built once, not per frame.
+- Prototype's `time.sleep(0.005)` simulation removed; aggregation keeps only sampled valid
+  detections (median-area polygon = stable output) plus running stats.
+
+See `DECISIONS.md` for trade-offs, assumptions, and AI disclosure.
