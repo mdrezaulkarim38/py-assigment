@@ -78,5 +78,5 @@ class AppConfig(BaseModel):
             raise ConfigError(f"Cannot read config file {p}: {e}") from e
         try:
             return cls.model_validate(raw)
-        except Exception as e:  # pydantic ValidationError
+        except Exception as e:
             raise ConfigError(f"Invalid configuration in {p}:\n{e}") from e
