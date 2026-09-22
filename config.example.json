@@ -1,0 +1,25 @@
+{
+  "video_path": "synthetic_pitch_feed.mp4",
+  "sample_stride": 15,
+  "max_frames": null,
+  "confidence_threshold": 0.5,
+  "field_detector": {
+    "type": "green_threshold",
+    "sport": "football",
+    "min_area": 1000.0
+  },
+  "crop_search": {
+    "aspect_ratio": "16:9",
+    "padding_px": 20
+  },
+  "reporting": {
+    "enabled": true,
+    "base_url": "http://127.0.0.1:5000",
+    "job_id": "local-dev-job",
+    "progress_every_n_frames": 30,
+    "timeout_s": 2.0
+  },
+  "output_path": "output/result.json",
+  "log_level": "INFO",
+  "debug_mode": false
+}
